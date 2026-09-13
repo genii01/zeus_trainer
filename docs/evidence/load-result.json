@@ -1,0 +1,16 @@
+[
+  {
+    "concurrency": 1,
+    "requests": 20,
+    "successes": 20,
+    "p50_client_ms": 39.80891709215939,
+    "p95_client_ms": 42.50683286227286
+  },
+  {
+    "concurrency": 4,
+    "requests": 20,
+    "successes": 20,
+    "p50_client_ms": 50.20475015044212,
+    "p95_client_ms": 74.30537510663271
+  }
+]

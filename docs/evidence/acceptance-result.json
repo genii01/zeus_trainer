@@ -1,0 +1,181 @@
+{
+  "model_control": {
+    "unauthorized": 401,
+    "unloaded_readiness": 503,
+    "unloaded_inference": 503,
+    "restored_request_id": "f6b09976-a94f-45a3-816e-857ed929c38b"
+  },
+  "filebeat_catchup": {
+    "passed": true,
+    "request_ids": [
+      "45c3490f-53c0-42fd-b16f-b691cdb02e1c",
+      "0cafea4f-03e7-4d30-9770-889248bf4910",
+      "313b565d-faaf-4da8-aa7f-ddfb052fce72"
+    ]
+  },
+  "filebeat_rotation": {
+    "passed": true,
+    "request_ids": [
+      "caa72d60-3027-4e57-b1d5-2ac77399df37",
+      "a32da97c-3923-4e99-9ebc-8ca4f35f4c33"
+    ]
+  },
+  "grafana_probe_requests": [
+    "b13fc54c-f152-4933-b4d0-7d71afafefa2",
+    "7fa10d37-ecb3-4899-aad1-e1c5353733f6",
+    "f12cd968-dc11-4172-b0b8-89c340d9a77f"
+  ],
+  "grafana_panels": [
+    {
+      "panel": "FastAPI requests / second",
+      "ref_id": "A",
+      "query_valid": true,
+      "finite_required": true,
+      "finite_series": 6,
+      "sample_values": [
+        0.1818082650037271,
+        0.1818082650037271,
+        0.0
+      ]
+    },
+    {
+      "panel": "FastAPI error rate",
+      "ref_id": "A",
+      "query_valid": true,
+      "finite_required": false,
+      "finite_series": 1,
+      "sample_values": [
+        0.0
+      ]
+    },
+    {
+      "panel": "FastAPI request latency",
+      "ref_id": "A",
+      "query_valid": true,
+      "finite_required": true,
+      "finite_series": 4,
+      "sample_values": [
+        0.02561123541316665,
+        0.03782133038755957,
+        0.002589285714285714
+      ]
+    },
+    {
+      "panel": "FastAPI request latency",
+      "ref_id": "B",
+      "query_valid": true,
+      "finite_required": true,
+      "finite_series": 4,
+      "sample_values": [
+        0.04936047124321434,
+        0.004919642857142857,
+        0.00475
+      ]
+    },
+    {
+      "panel": "Triton roundtrip p95 (FastAPI)",
+      "ref_id": "A",
+      "query_valid": true,
+      "finite_required": true,
+      "finite_series": 1,
+      "sample_values": [
+        0.02425
+      ]
+    },
+    {
+      "panel": "Inflight API requests",
+      "ref_id": "A",
+      "query_valid": true,
+      "finite_required": true,
+      "finite_series": 1,
+      "sample_values": [
+        1.0
+      ]
+    },
+    {
+      "panel": "Upstream errors / second",
+      "ref_id": "A",
+      "query_valid": true,
+      "finite_required": false,
+      "finite_series": 1,
+      "sample_values": [
+        0.0
+      ]
+    },
+    {
+      "panel": "Triton successes and failures / second",
+      "ref_id": "A",
+      "query_valid": true,
+      "finite_required": true,
+      "finite_series": 1,
+      "sample_values": [
+        0.10909487617731554
+      ]
+    },
+    {
+      "panel": "Triton successes and failures / second",
+      "ref_id": "B",
+      "query_valid": true,
+      "finite_required": false,
+      "finite_series": 1,
+      "sample_values": [
+        0.0
+      ]
+    },
+    {
+      "panel": "Triton mean request, queue, and compute latency",
+      "ref_id": "A",
+      "query_valid": true,
+      "finite_required": true,
+      "finite_series": 1,
+      "sample_values": [
+        13.120666666666667
+      ]
+    },
+    {
+      "panel": "Triton mean request, queue, and compute latency",
+      "ref_id": "B",
+      "query_valid": true,
+      "finite_required": true,
+      "finite_series": 1,
+      "sample_values": [
+        0.0765
+      ]
+    },
+    {
+      "panel": "Triton mean request, queue, and compute latency",
+      "ref_id": "C",
+      "query_valid": true,
+      "finite_required": true,
+      "finite_series": 1,
+      "sample_values": [
+        12.863166666666665
+      ]
+    },
+    {
+      "panel": "Triton inference count / second",
+      "ref_id": "A",
+      "query_valid": true,
+      "finite_required": true,
+      "finite_series": 1,
+      "sample_values": [
+        0.10909487617731553
+      ]
+    },
+    {
+      "panel": "Scrape target health",
+      "ref_id": "A",
+      "query_valid": true,
+      "finite_required": true,
+      "finite_series": 2,
+      "sample_values": [
+        1.0,
+        1.0
+      ]
+    }
+  ],
+  "kibana": {
+    "dashboard_panels": 5,
+    "numeric_fields_discovered": true
+  }
+}

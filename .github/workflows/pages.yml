@@ -1,0 +1,47 @@
+name: Documentation Pages
+
+on:
+  push:
+    branches: [master]
+    paths: ['docs/**', 'scripts/check_docs.py', '.github/workflows/pages.yml']
+  pull_request:
+    branches: [master]
+    paths: ['docs/**', 'scripts/check_docs.py', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check local document links and structure
+        run: python3 scripts/check_docs.py
+      - name: Check JavaScript syntax
+        run: node --check docs/assets/app.js
+
+  deploy:
+    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: docs
+      - uses: actions/deploy-pages@v4
+        id: deployment

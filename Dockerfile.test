@@ -1,0 +1,10 @@
+FROM python:3.11.11-slim-bookworm
+WORKDIR /srv
+COPY requirements.txt requirements-dev.txt requirements-lock.txt ./
+RUN pip install --no-cache-dir -r requirements-dev.txt -c requirements-lock.txt
+COPY app ./app
+COPY tests ./tests
+COPY scripts ./scripts
+COPY observability ./observability
+COPY pytest.ini ./
+CMD ["python", "-m", "pytest", "-q"]

@@ -1,0 +1,171 @@
+name: mobilenet-observability
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  test:
+    profiles: [tools]
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    volumes:
+      - ./artifacts:/srv/artifacts:ro
+    mem_limit: 1g
+    logging: *logging
+
+  model-export:
+    profiles: [tools]
+    build:
+      context: .
+      dockerfile: Dockerfile.export
+    volumes:
+      - ./artifacts:/work/artifacts
+      - ./model_repository:/work/model_repository
+      - torch-cache:/root/.cache/torch
+    mem_limit: 3g
+    cpus: 2
+    logging: *logging
+
+  triton:
+    image: nvcr.io/nvidia/tritonserver:25.08-py3
+    entrypoint: [tritonserver]
+    command:
+      - --model-repository=/models
+      - --model-control-mode=explicit
+      - --load-model=mobilenet_v2
+      - --allow-gpu-metrics=false
+      - --allow-cpu-metrics=true
+      - --log-format=ISO8601
+      - --log-verbose=0
+    volumes:
+      - ./model_repository:/models:ro
+    healthcheck:
+      test: [CMD, curl, -fsS, http://localhost:8000/v2/health/live]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    mem_limit: 3g
+    cpus: 3
+    shm_size: 256m
+    logging: *logging
+
+  api:
+    build: .
+    environment:
+      TRITON_URL: http://triton:8000
+      LABELS_PATH: /models/labels.json
+      LOG_PATH: /var/log/inference/events.jsonl
+      ADMIN_API_KEY: ${ADMIN_API_KEY:?Run python3 scripts/init_env.py first}
+    volumes:
+      - ./artifacts:/models:ro
+      - inference-logs:/var/log/inference
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on:
+      triton: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 1g
+    cpus: 2
+    logging: *logging
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.3
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms1g -Xmx1g
+    volumes: ["es-data:/usr/share/elasticsearch/data"]
+    ports: ["127.0.0.1:9200:9200"]
+    healthcheck:
+      test: [CMD-SHELL, "curl -fsS 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=2s' > /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    mem_limit: 2g
+    cpus: 2
+    logging: *logging
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.17.3
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      TELEMETRY_ENABLED: "false"
+      XPACK_SECURITY_ENABLED: "false"
+    ports: ["127.0.0.1:5601:5601"]
+    depends_on:
+      elasticsearch: {condition: service_healthy}
+    healthcheck:
+      test: [CMD-SHELL, "curl -fsS http://localhost:5601/api/status > /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 40
+    mem_limit: 2g
+    cpus: 2
+    logging: *logging
+
+  observability-init:
+    image: python:3.11.11-slim-bookworm
+    working_dir: /work
+    command: [python, scripts/bootstrap_observability.py]
+    environment:
+      ES_URL: http://elasticsearch:9200
+      KIBANA_URL: http://kibana:5601
+    volumes:
+      - ./scripts:/work/scripts:ro
+      - ./observability:/work/observability:ro
+    depends_on:
+      elasticsearch: {condition: service_healthy}
+      kibana: {condition: service_healthy}
+    logging: *logging
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.17.3
+    user: root
+    command: [filebeat, -e, --strict.perms=false]
+    volumes:
+      - ./observability/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - inference-logs:/var/log/inference:ro
+      - filebeat-data:/usr/share/filebeat/data
+    depends_on:
+      observability-init: {condition: service_completed_successfully}
+    mem_limit: 256m
+    logging: *logging
+
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.retention.time=7d]
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports: ["127.0.0.1:9090:9090"]
+    mem_limit: 512m
+    logging: *logging
+
+  grafana:
+    image: grafana/grafana:11.6.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Run python3 scripts/init_env.py first}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports: ["127.0.0.1:3000:3000"]
+    mem_limit: 512m
+    logging: *logging
+
+volumes:
+  torch-cache:
+  inference-logs:
+  es-data:
+  filebeat-data:
+  prometheus-data:
+  grafana-data:

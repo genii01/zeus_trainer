@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="MobileNet · Triton · FastAPI의 이미지 추론, 구조화 로그, Prometheus 모니터링을 설명하는 운영 가이드">
+<title>MobileNet 시스템 아틀라스 — 추론부터 관측까지</title>
+<link rel="stylesheet" href="assets/style.css"><script src="assets/app.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<header><a class="brand" href="#">M<span>↗</span> SYSTEM ATLAS</a><span class="edition">LOCAL CPU / ENGINEERING GUIDE</span><a href="#operations">운영 가이드 ↗</a></header>
+<div class="layout"><aside><p class="eyebrow">CONTENTS</p><nav aria-label="문서 목차"><a href="#architecture">01 전체 구조</a><a href="#request">02 이미지 요청의 여정</a><a href="#logs">03 결과를 로그로 추적</a><a href="#metrics">04 성능을 메트릭으로 관측</a><a href="#operations">05 시작 · 종료 · 복구</a><a href="#troubleshooting">06 문제를 찾는 순서</a><a href="#reference">07 설정 파일 · 검증 · 배포</a></nav><div class="side-note"><span class="dot"></span> 정적 설명 문서<p>표시된 수치는 검증 예시입니다. 실시간 상태는 로컬 Kibana와 Grafana에서 확인하세요.</p></div></aside>
+<main id="main">
+<section class="hero"><p class="eyebrow">MOBILENET OBSERVABILITY / 01</p><h1>이미지 한 장에서,<br><span>운영의 전체 흐름까지.</span></h1><p class="lead">FastAPI가 요청을 받고 Triton이 추론합니다.<br>결과는 로그로 남고, 성능은 메트릭으로 이어집니다.</p><div class="badges"><span>Apple Silicon · ARM64</span><span>ONNX Runtime · CPU</span><span>Docker Compose</span></div><div class="facts"><div><strong>1,000</strong><span>ImageNet 분류 클래스</span></div><div><strong>5s</strong><span>Prometheus 수집 주기</span></div><div><strong>7d</strong><span>색인 삭제 정책 / 메트릭 보관</span></div><div><strong>3개 경로</strong><span>추론 · 로그 · 메트릭</span></div></div></section>
+<section id="architecture"><div class="section-head"><p class="eyebrow">01 / ARCHITECTURE</p><h2>서로 다른 세 경로가 연결됩니다.</h2><p>버튼으로 경로를 강조하고, 구성 요소를 눌러 실제 주소·역할·설정을 확인하세요. 화살표는 요청이나 데이터가 이동하는 방향입니다.</p></div>
+<div class="filters" role="group" aria-label="구조도 경로 강조"><button data-flow="all" aria-pressed="true">전체 보기</button><button data-flow="inference" aria-pressed="false">① 추론</button><button data-flow="logs" aria-pressed="false">② 로그</button><button data-flow="metrics" aria-pressed="false">③ 메트릭</button></div>
+<div class="architecture" id="map">
+<div class="lane" data-lane="inference"><div class="lane-title"><b>01</b> 이미지 → 분류 결과 <small>동기 HTTP 요청</small></div><div class="nodes"><button class="node" data-component="client"><small>HOST</small><strong>로컬 클라이언트</strong><span>curl · JPEG / PNG</span></button><span class="arrow">→<small>multipart</small></span><button class="node" data-component="api"><small>:8000</small><strong>FastAPI</strong><span>전처리 · 후처리 · JSON 로그</span></button><span class="arrow">⇄<small>HTTP V2 binary</small></span><button class="node" data-component="triton"><small>INTERNAL :8000</small><strong>Triton</strong><span>MobileNetV2 · ONNX · CPU</span></button></div><p class="lane-foot">반환: Triton logits → FastAPI softmax + top-k + 레이블 → 클라이언트 JSON</p></div>
+<div class="lane" data-lane="logs"><div class="lane-title"><b>02</b> 요청별 결과 → 검색 <small>파일 수집 · 비동기 전송</small></div><div class="nodes"><button class="node" data-component="logger"><small>SHARED VOLUME</small><strong>JSONL 로그</strong><span>FastAPI → inference-logs</span></button><span class="arrow">→<small>read</small></span><button class="node" data-component="filebeat"><small>SHIPPER</small><strong>Filebeat</strong><span>파싱 · 오프셋 추적 · 전송</span></button><span class="arrow">→<small>index</small></span><button class="node" data-component="elasticsearch"><small>:9200</small><strong>Elasticsearch</strong><span>숫자 매핑 · 색인 · 7일 ILM</span></button></div><p class="lane-foot">Kibana(:5601) → Elasticsearch 조회 → 레이블·확률·지연시간 표와 분포 표시</p><button class="inline-node" data-component="kibana">Kibana 상세 ↗</button></div>
+<div class="lane" data-lane="metrics"><div class="lane-title"><b>03</b> 누적 카운터 → 성능 추이 <small>Prometheus가 pull</small></div><div class="nodes"><button class="node" data-component="targets"><small>/metrics</small><strong>FastAPI + Triton</strong><span>api:8000 · triton:8002</span></button><span class="arrow">←<small>GET / 5s</small></span><button class="node" data-component="prometheus"><small>:9090</small><strong>Prometheus</strong><span>시계열 저장 · PromQL</span></button><span class="arrow">←<small>query</small></span><button class="node" data-component="grafana"><small>:3000</small><strong>Grafana</strong><span>RPS · 오류율 · 지연시간</span></button></div><p class="lane-foot">응답 데이터는 화살표의 반대 방향으로 돌아옵니다. Grafana의 데이터 소스는 Prometheus입니다.</p></div>
+</div>
+<div class="detail" id="component-detail" aria-live="polite"><p class="eyebrow">COMPONENT INSPECTOR</p><h3 id="detail-title">FastAPI</h3><p id="detail-body">이미지를 검증하고 텐서로 변환해 Triton에 전달합니다. logits를 확률·레이블로 후처리한 뒤 응답과 구조화 로그를 생성합니다.</p><dl id="detail-meta"><dt>주소</dt><dd>localhost:8000 → api:8000</dd><dt>설정</dt><dd>app/main.py · app/settings.py · Dockerfile</dd></dl></div>
+<p class="note">Docker 내부에서는 서비스 이름으로 통신합니다. 호스트에 공개하는 포트는 모두 127.0.0.1에 바인딩됩니다. Triton 포트는 호스트에 공개하지 않습니다.</p>
+</section>
+<section id="request"><div class="section-head"><p class="eyebrow">02 / REQUEST LIFECYCLE</p><h2>이미지는 어디서 결과가 될까요?</h2></div><ol class="journey"><li><h3>입력 검증과 요청 식별</h3><p><code>POST /v1/classify?top_k=5</code>에 multipart <code>file</code>을 보냅니다. 서버가 생성한 UUID는 응답의 <code>request_id</code>, <code>X-Request-ID</code>, Triton 요청 ID, 로그의 <code>request.id</code>로 연결됩니다.</p><span class="tag">JPEG/PNG ≤ 10 MiB · top_k 1–10 · 최대 동시 추론 4</span></li><li><h3>FastAPI: 이미지 → FP32 텐서</h3><p>EXIF 방향 보정 → RGB → 짧은 변 232로 bilinear resize → 중앙 224×224 crop → 0–1 스케일 → ImageNet 평균·표준편차 정규화 → NCHW 순서로 바꿉니다. 디코딩·리사이즈는 threadpool에서 처리합니다.</p><span class="tag">input: [1, 3, 224, 224] · FP32 · 약 588 KiB</span></li><li><h3>Triton: ONNX 모델 실행</h3><p><code>/v2/models/mobilenet_v2/versions/1/infer</code>로 JSON 메타데이터와 binary tensor를 전송합니다. CPU instance 1개, intra-op 2 / inter-op 1 thread로 실행합니다. 고정 batch 1이며 dynamic batching은 설정하지 않았습니다.</p><span class="tag">logits: [1, 1000] · FP32 · 4,000 bytes</span></li><li><h3>FastAPI: logits → probability · label</h3><p>출력 shape·dtype·유한값·요청 ID를 검사합니다. 1,000개 logits에 안정적인 softmax를 적용하고 top-k class_id를 <code>artifacts/labels.json</code>으로 매핑합니다. Triton은 이 구성에서 레이블이 아닌 logits를 반환합니다.</p></li><li><h3>응답 반환과 이벤트 기록</h3><p>예측값과 단계별 시간을 JSON으로 반환하고 구조화 로그를 기록합니다. Filebeat의 수집·색인을 기다린 뒤 응답하는 구조는 아닙니다. 클라이언트 결과가 먼저 보이고 Kibana에는 뒤이어 나타날 수 있습니다.</p></li></ol>
+<div class="two-col"><div class="code-card"><h3>로컬에서 호출</h3><pre><code>curl --fail-with-body \
+  -F 'file=@artifacts/sample.jpg' \
+  'http://localhost:8000/v1/classify?top_k=5'</code></pre></div><div class="result-card"><p class="eyebrow">실제 검증 샘플 · 고정된 예시</p><h3>Samoyed <span>30.91%</span></h3><div class="prob"><i style="width:30.91233%"></i></div><p>class_id 258 · softmax 0.3091233<br>확률은 모델의 분류 점수이며 정확도 보증이 아닙니다.</p></div></div>
+<h3>지연시간의 경계를 구분하세요.</h3><div class="timing"><span>전처리<br><b>25.72 ms</b></span><span>왕복 추론<br><b>14.97 ms</b></span><span>후처리<br><b>0.12 ms</b></span></div><p class="note">샘플 한 요청의 total은 40.95 ms입니다. 작은 부가 작업 때문에 단계 합과 다를 수 있습니다. <code>latency.total_ms</code>는 endpoint 처리 구간이며 multipart 수신·파싱과 최종 응답 전송은 제외합니다. <code>api_request_duration_seconds</code>는 업로드 수신·파싱을 포함하고 최종 응답 전송은 제외합니다. 왕복 추론 시간에는 네트워크·Triton 큐·계산·응답 검증이 포함됩니다.</p></section>
+<section id="logs"><div class="section-head"><p class="eyebrow">03 / LOGGING</p><h2>“이 요청은 무엇을 예측했나?”</h2><p>Kibana는 요청 단위의 사실을 찾는 도구입니다. probability와 label은 Triton 로그 옵션을 켜는 것으로 생기지 않습니다. FastAPI의 후처리 완료 지점에서 기록합니다.</p></div>
+<div class="two-col"><div><h3>1. 한 이벤트, 한 JSON 줄</h3><p><code>app/logging_config.py</code>의 formatter가 UTC 시간, 서비스명, 로그 레벨, event UUID를 추가합니다. INFO 성공 이벤트와 실패 이벤트를 stdout 및 공유 볼륨 파일에 기록합니다.</p><h3>2. Filebeat가 파일만 수집</h3><p><code>/var/log/inference/events.jsonl*</code>을 읽습니다. stdout은 Docker 운영 로그용이며 중복 수집하지 않습니다. 파일은 10 MiB마다 회전하고 백업 5개를 보존합니다. 현재 logger는 단일 worker 기준입니다.</p><h3>3. 파싱 · 식별 · 저장</h3><p>ndjson의 <code>expand_keys: true</code>가 dotted 키를 객체로 펼칩니다. 256-byte fingerprint로 파일을 구별하고 registry 볼륨에 읽은 위치를 기록합니다. event.id를 문서 ID로 사용해 재전송 중복을 억제합니다.</p></div><div class="code-card"><h3>성공 로그의 핵심 필드 (예시)</h3><pre><code>{
+  "@timestamp": "2026-09-13T00:00:00.000Z",
+  "event.id": "이벤트-UUID",
+  "event.action": "inference.completed",
+  "event.outcome": "success",
+  "service.name": "fastapi",
+  "request.id": "응답의-request_id",
+  "model.name": "mobilenet_v2",
+  "model.version": "1",
+  "classification.label": "Samoyed",
+  "classification.probability": 0.3091233,
+  "latency.triton_roundtrip_ms": 14.97,
+  "latency.total_ms": 40.95,
+  "event.duration": 40950000
+}</code></pre><p>event.duration의 단위는 ns입니다. 전체 로그에는 classification.top_k와 단계별 지연도 포함됩니다. 이미지 바이트·파일명·API 키는 기록하지 않습니다.</p></div></div>
+<div class="table-wrap"><table><caption>Elasticsearch 매핑이 검색과 집계를 결정합니다</caption><thead><tr><th>필드</th><th>타입</th><th>Kibana에서 하는 일</th></tr></thead><tbody><tr><td>request.id / classification.label</td><td>keyword</td><td>UUID 정확히 검색 / 레이블 분포</td></tr><tr><td>classification.probability</td><td>double</td><td>범위 필터 / 확률 histogram</td></tr><tr><td>latency.*_ms</td><td>double</td><td>평균, p50, p95, 느린 요청 검색</td></tr><tr><td>classification.top_k</td><td>nested</td><td>문서에서 순위·레이블·확률 쌍 확인</td></tr><tr><td>@timestamp</td><td>date</td><td>시간 범위 / 시계열</td></tr></tbody></table></div>
+<h3>응답 UUID 하나로 추적하기</h3><div class="steps"><p><b>01</b> curl 응답의 request_id 복사</p><p><b>02</b> Kibana Discover → inference-events-*</p><p><b>03</b> 시간 범위를 최근 24시간으로 선택</p><p><b>04</b> 아래 KQL로 필터 → 문서 펼치기</p></div><pre><code>request.id : "응답에서-복사한-UUID"
+classification.label : "Samoyed" and classification.probability &lt; 0.5
+event.outcome : "failure"
+latency.total_ms &gt; 100</code></pre><p class="note">네 줄은 각각 독립적인 검색 예시입니다. 일자별 색인은 <code>inference-events-yyyy.MM.dd</code>이며 ILM은 색인 생성 후 7일이 지나면 삭제 대상으로 삼습니다. Filebeat 중단 중에는 파일에 누적되지만, 회전 보관량을 초과하면 손실될 수 있습니다. exactly-once를 보장하지 않습니다.</p></section>
+<section id="metrics"><div class="section-head"><p class="eyebrow">04 / METRICS</p><h2>“지금 서버는 어떻게 동작하나?”</h2><p>FastAPI·Triton이 메트릭을 노출하고 Prometheus가 수집합니다. Grafana는 PromQL 쿼리 결과를 그립니다. 요청별 상세 결과와 장기간 성능 추이는 서로 다른 데이터입니다.</p></div>
+<div class="table-wrap"><table><thead><tr><th>운영 질문</th><th>관측 위치 / 메트릭</th><th>해석</th></tr></thead><tbody><tr><td>메트릭을 읽을 수 있나?</td><td>up{job="api"}, up{job="triton"}</td><td>1 = scrape 성공. 모델 준비 여부는 /health/ready로 별도 확인</td></tr><tr><td>얼마나 요청하나?</td><td>rate(api_requests_total[1m])</td><td>초당 요청 수. 추론만 보려면 route 필터</td></tr><tr><td>사용자가 느린가?</td><td>api_request_duration_seconds_bucket</td><td>histogram 기반 p50 / p95</td></tr><tr><td>Triton 왕복이 느린가?</td><td>api_inference_duration_seconds_bucket</td><td>FastAPI에서 잰 왕복 추론 p95</td></tr><tr><td>큐 또는 계산이 느린가?</td><td>nv_inference_queue_duration_us / nv_inference_compute_infer_duration_us</td><td>누적 counter의 증가량을 성공 요청 증가량으로 나눠 평균 ms 계산</td></tr><tr><td>어떤 요청이 실패했나?</td><td>api_requests_total의 status / api_upstream_errors_total</td><td>메트릭으로 추세 확인 → Kibana failure 이벤트로 상세 조사</td></tr></tbody></table></div>
+<div class="two-col"><div class="code-card"><h3>FastAPI p95 · 초 → ms</h3><pre><code>histogram_quantile(0.95,
+  sum by (le) (
+    rate(api_request_duration_seconds_bucket{
+      route="/v1/classify"
+    }[1m])
+  )
+) * 1000</code></pre></div><div class="code-card"><h3>Triton 순수 계산 평균 · μs → ms</h3><pre><code>rate(nv_inference_compute_infer_duration_us{
+  model="mobilenet_v2"
+}[1m])
+/
+rate(nv_inference_request_success{
+  model="mobilenet_v2"
+}[1m]) / 1000</code></pre></div></div>
+<p class="note">누적시간 카운터만으로 요청별 p95를 계산할 수 없습니다. Grafana의 Triton 계산·큐 패널은 평균이며, 왕복 p95는 FastAPI histogram 기반입니다. request_id와 분류 label은 메트릭 label로 넣지 않아 시계열 개수가 요청마다 증가하지 않습니다.</p>
+<div class="callout"><h3>No data가 곧 장애는 아닙니다.</h3><p>요청이 없는 구간에서는 분모가 0이거나 histogram 관측치가 없어 지연값이 비어 있을 수 있습니다. 최근 15분을 선택하고 샘플 요청을 여러 번 보내세요. 현재 구성은 대시보드와 수집을 제공하며 알림 규칙·Alertmanager·외부 알림 채널은 설정하지 않았습니다.</p></div></section>
+<section id="operations"><div class="section-head"><p class="eyebrow">05 / OPERATIONS</p><h2>내리고, 다시 올리고, 확인하기.</h2><p>모든 명령은 저장소 루트에서 실행합니다. 일상적인 종료는 데이터를 보존합니다. 아래 명령은 설명용이며 클릭만으로 실행되지 않습니다.</p></div>
+<div class="table-wrap"><table><thead><tr><th>목적</th><th>명령</th><th>남는 것 / 후속 명령</th></tr></thead><tbody><tr><td>잠시 멈춤</td><td><code>docker compose stop</code></td><td>컨테이너·네트워크·볼륨 유지 → start</td></tr><tr><td>멈춘 컨테이너 재개</td><td><code>docker compose start</code></td><td>기존 컨테이너만 시작. 코드·환경 변경 반영 안 됨</td></tr><tr><td>일반 종료</td><td><code>docker compose down</code></td><td>컨테이너·Compose 네트워크 삭제, 볼륨·모델·.env 유지</td></tr><tr><td>다시 실행</td><td><code>docker compose up -d</code></td><td>컨테이너 재생성, 기존 저장 데이터 재사용</td></tr><tr><td>API 코드 변경 반영</td><td><code>docker compose up -d --build api</code></td><td>이미지 rebuild 및 필요 시 컨테이너 교체</td></tr><tr><td>모든 Compose 볼륨 삭제</td><td><code>docker compose down -v</code></td><td>ES 색인·로그·registry·메트릭·Grafana DB·torch cache 삭제</td></tr></tbody></table></div>
+<details open><summary>처음 실행하는 경우</summary><pre><code>python3 scripts/init_env.py
+docker compose build model-export api
+docker compose run --rm model-export
+docker compose up -d
+docker compose ps -a
+curl --fail http://localhost:8000/health/ready</code></pre><p>export는 모델·레이블·샘플·기준 출력을 생성하고 ONNX 수치 비교까지 검증합니다. Triton healthy 후 API가 시작하고, Elasticsearch와 Kibana healthy 후 observability-init가 실행됩니다. init가 성공 종료한 뒤 Filebeat가 시작합니다. 최초 다운로드·시작은 수 분 걸릴 수 있습니다.</p></details>
+<details open><summary>일반 종료 후 다시 실행하는 경우</summary><pre><code>docker compose down
+# 나중에 같은 저장소 디렉터리에서:
+docker compose up -d
+docker compose ps -a
+curl --fail http://localhost:8000/health/ready
+curl --fail-with-body -F 'file=@artifacts/sample.jpg' \
+  'http://localhost:8000/v1/classify?top_k=5'</code></pre><p>매번 export하거나 .env를 새로 만들 필요가 없습니다. 모델과 artifacts가 존재해야 합니다. 컨테이너 상태가 healthy여도 모델은 언로드 상태일 수 있으므로 ready와 실제 분류까지 확인합니다. <code>observability-init</code>의 Exited (0)은 정상입니다.</p></details>
+<details><summary>설정·모델을 수정한 경우</summary><pre><code># API 코드·의존성 변경
+docker compose up -d --build api
+# .env 환경변수 변경
+docker compose up -d --force-recreate api grafana
+# 마운트된 수집 설정 변경
+docker compose restart filebeat prometheus grafana
+# ES template / Kibana 저장 객체 변경
+docker compose run --rm observability-init
+# 모델 재생성: 요청을 멈춘 뒤 실행
+docker compose stop api triton
+docker compose run --rm model-export
+docker compose up -d triton api</code></pre><p><code>restart</code>는 새 이미지나 변경된 컨테이너 환경변수를 적용하지 않습니다. Grafana의 기존 관리자 비밀번호는 DB에 남으므로 .env 수정·재생성만으로 바뀌지 않습니다. ES의 기존 필드 타입도 template 변경만으로 바뀌지 않으며 새 색인/재색인 검토가 필요합니다.</p></details>
+<details><summary>데이터를 삭제하고 완전히 초기화하는 경우</summary><div class="warning">실행하면 저장된 요청 로그·메트릭·Grafana 사용자 설정이 삭제됩니다. 필요한 데이터는 먼저 백업하세요.</div><pre><code>docker compose down -v
+docker compose up -d
+docker compose ps -a
+curl --fail http://localhost:8000/health/ready</code></pre><p>호스트의 <code>artifacts/</code>, <code>model_repository/</code>, <code>.env</code>와 Docker 이미지는 남습니다. 따라서 파일이 존재하면 재export 없이 시작합니다. Kibana 객체와 Grafana provisioning은 다시 생성됩니다. 컨테이너 볼륨의 과거 추론 이력은 복원되지 않습니다.</p></details>
+<h3>컨테이너 종료와 모델 언로드는 다릅니다.</h3><p>FastAPI의 관리자 API는 Triton 내부 모델을 로드·언로드합니다. Docker 컨테이너 시작·종료는 Compose가 담당합니다. 모델 언로드는 프로세스를 내리지 않으며 live 200 / ready 503 / classify 503이 됩니다.</p><pre><code>set -a
+source .env
+set +a
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${ADMIN_API_KEY}" \
+  http://localhost:8000/v1/models/mobilenet_v2/unload
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${ADMIN_API_KEY}" \
+  http://localhost:8000/v1/models/mobilenet_v2/load</code></pre>
+<h3>로컬 운영 화면</h3><p>아래 localhost 링크는 이 문서를 보는 컴퓨터의 서버로 연결됩니다. GitHub Pages가 추론 서버를 실행하거나 원격 서버에 연결해 주지는 않습니다.</p><div class="links"><a href="http://localhost:8000/docs">FastAPI :8000 ↗</a><a href="http://localhost:5601/app/dashboards#/view/inference-overview">Kibana :5601 ↗</a><a href="http://localhost:3000/d/inference-overview">Grafana :3000 ↗</a><a href="http://localhost:9090/targets">Prometheus targets ↗</a></div><p class="note">Grafana: admin / .env의 GRAFANA_ADMIN_PASSWORD. Elasticsearch·Kibana 인증은 로컬 실습용으로 비활성화되어 있습니다. 외부 운영 배포에는 인증·TLS·접근 제어를 별도로 설계해야 합니다. Compose에는 자동 재시작 정책이 없으므로 Docker/호스트 재시작 뒤에는 up -d와 readiness를 확인하세요.</p></section>
+<section id="troubleshooting"><div class="section-head"><p class="eyebrow">06 / DIAGNOSIS</p><h2>증상에서 원인으로 좁혀 갑니다.</h2></div><div class="trouble-grid"><article><span class="tag">API 503</span><h3>서버인가, 모델인가?</h3><p>live → ready 순으로 확인합니다. 모델이 언로드되었으면 관리자 load를 호출합니다. Triton 로그와 ONNX 파일 존재 여부를 확인하세요.</p><code>docker compose logs --tail=100 triton api</code></article><article><span class="tag">KIBANA EMPTY</span><h3>생성 → 수집 → 색인 → 검색</h3><p>실제 요청을 보낸 뒤 API 로그, Filebeat 로그, init 종료 코드를 봅니다. 최대 60초 기다리고 data view·시간 범위·request.id 필터를 확인합니다.</p><code>docker compose logs --tail=100 api filebeat observability-init</code></article><article><span class="tag">GRAFANA NO DATA</span><h3>scrape 성공부터 확인</h3><p>Prometheus Targets에서 api/triton UP 확인 → 연속 추론 생성 → 최근 15분으로 조회합니다. 모델 언로드 중에는 해당 모델 메트릭이 사라질 수 있습니다.</p><code>docker compose logs --tail=100 prometheus grafana</code></article><article><span class="tag">429 / 504</span><h3>부하인가, upstream 지연인가?</h3><p>429는 동시 추론 제한 초과입니다. 504는 Triton 호출 timeout입니다. inflight, 큐 평균, 계산 평균, 왕복 p95를 비교하고 failure 로그를 조회합니다.</p><code>api_inflight_requests · api_upstream_errors_total</code></article></div><div class="callout"><h3>장애 구간의 차이</h3><p>Filebeat가 중단되면 API는 파일에 계속 기록하며 재시작 후 수집을 따라잡습니다. Elasticsearch 중단은 로그 조회·전송에 영향을 줍니다. Prometheus 중단 구간의 메트릭은 나중에 소급 수집되지 않습니다. Triton이 준비되지 않으면 이미지 분류가 실패합니다. 이 구성은 단일 노드이므로 고가용성을 제공하지 않습니다.</p></div></section>
+<section id="reference"><div class="section-head"><p class="eyebrow">07 / REFERENCE</p><h2>그림을 실제 파일로 연결합니다.</h2></div><div class="table-wrap"><table><thead><tr><th>책임</th><th>파일</th></tr></thead><tbody><tr><td>서비스·포트·볼륨·시작 의존성</td><td>docker-compose.yml</td></tr><tr><td>API 라우팅·요청 식별·관리자 제어</td><td>app/main.py · app/settings.py</td></tr><tr><td>전처리·Triton HTTP·softmax</td><td>app/preprocessing.py · app/inference.py</td></tr><tr><td>logger·Prometheus 계측</td><td>app/logging_config.py · app/metrics.py</td></tr><tr><td>모델 입력·출력·CPU instance</td><td>model_repository/mobilenet_v2/config.pbtxt</td></tr><tr><td>로그 수집·필드 매핑·Kibana 객체</td><td>observability/filebeat.yml · elasticsearch-template.json · kibana.ndjson</td></tr><tr><td>메트릭 수집·Grafana provisioning</td><td>observability/prometheus.yml · observability/grafana/</td></tr><tr><td>초기화·통합 검증·부하 실험</td><td>scripts/bootstrap_observability.py · smoke_test.py · acceptance_test.py · load_test.py</td></tr></tbody></table></div>
+<div class="two-col"><article class="result-card"><p class="eyebrow">VERIFIED / 2026-09-13</p><h3>실제 모델과 실제 서버로 확인</h3><ul><li>단위 테스트 37개 통과: 호스트와 Docker</li><li>PyTorch ↔ Triton 1,000 logits 비교: max abs error 약 7.15e-6</li><li>동시성 1 / 4에서 각각 20회 모두 성공</li><li>클라이언트 p95: 42.51 / 74.31 ms</li><li>Filebeat 재개 수집·모델 unload/load·대시보드 검증</li></ul><p>작은 로컬 CPU 실험이며 운영 SLA나 최대 처리량을 의미하지 않습니다.</p><a href="verification.md">검증 보고서 원문 ↗</a></article><article class="result-card"><p class="eyebrow">PUBLISHING</p><h3>GitHub Pages는 이 문서를 호스팅</h3><p><code>docs/index.html</code>과 로컬 CSS·JS만으로 동작합니다. 빌드나 외부 CDN 없이 열 수 있습니다. 저장소 Settings → Pages → Source를 GitHub Actions로 선택하면 master의 문서 변경을 workflow가 배포합니다.</p><p>PR은 검증만 수행합니다. 배포는 master push 또는 master에서 수동 실행할 때 수행합니다. 아직 병합되지 않은 PR을 자동 공개하지 않습니다.</p><a href="https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages">GitHub 공식 배포 설정 ↗</a></article></div>
+</section><footer>MobileNet System Atlas · CPU reference implementation<br>FastAPI 0.115.11 / Triton 25.08 / Elastic 8.17.3 / Prometheus 3.2.1 / Grafana 11.6.0</footer>
+</main></div>
+</body></html>

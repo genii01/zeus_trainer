@@ -1,0 +1,53 @@
+{
+  "index_patterns": ["inference-events-*"],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "index.lifecycle.name": "inference-events-7d",
+      "number_of_shards": 1,
+      "number_of_replicas": 0
+    },
+    "mappings": {
+      "dynamic": false,
+      "properties": {
+        "@timestamp": {"type": "date"},
+        "service": {"properties": {"name": {"type": "keyword"}}},
+        "log": {"properties": {"level": {"type": "keyword"}}},
+        "event": {"properties": {
+          "id": {"type": "keyword"},
+          "action": {"type": "keyword"},
+          "outcome": {"type": "keyword"},
+          "duration": {"type": "long"}
+        }},
+        "request": {"properties": {"id": {"type": "keyword"}}},
+        "model": {"properties": {
+          "name": {"type": "keyword"},
+          "version": {"type": "keyword"}
+        }},
+        "classification": {"properties": {
+          "label": {"type": "keyword"},
+          "class_id": {"type": "integer"},
+          "probability": {"type": "double"},
+          "top_k": {"type": "nested", "properties": {
+            "rank": {"type": "integer"},
+            "class_id": {"type": "integer"},
+            "label": {"type": "keyword"},
+            "probability": {"type": "double"}
+          }}
+        }},
+        "latency": {"properties": {
+          "preprocess_ms": {"type": "double"},
+          "triton_roundtrip_ms": {"type": "double"},
+          "postprocess_ms": {"type": "double"},
+          "total_ms": {"type": "double"}
+        }},
+        "http": {"properties": {"response": {"properties": {"status_code": {"type": "integer"}}}}},
+        "error": {"properties": {
+          "type": {"type": "keyword"},
+          "message": {"type": "text"}
+        }}
+      }
+    }
+  },
+  "_meta": {"description": "MobileNet inference events with seven-day retention"}
+}

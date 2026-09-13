@@ -1,0 +1,6 @@
+FROM python:3.11.11-slim-bookworm
+WORKDIR /work
+COPY requirements-export-lock.txt ./
+RUN pip install --no-cache-dir -r requirements-export-lock.txt
+COPY scripts/export_model.py scripts/validate_model.py ./scripts/
+CMD ["python", "scripts/export_model.py"]
