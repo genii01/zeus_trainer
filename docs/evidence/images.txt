@@ -1,0 +1,6 @@
+["nvcr.io/nvidia/tritonserver:25.08-py3"] arm64 ["nvcr.io/nvidia/tritonserver@sha256:f836551575df7c9fb71144073845c6b3911de57db91a8c95e0687a4d2ac9f7a5"]
+["docker.elastic.co/elasticsearch/elasticsearch:8.17.3"] arm64 ["docker.elastic.co/elasticsearch/elasticsearch@sha256:224c75e346bd745ce908f06a1cbad7bf10988961dcdcdfccb22556b3f856b3f0"]
+["docker.elastic.co/kibana/kibana:8.17.3"] arm64 ["docker.elastic.co/kibana/kibana@sha256:7dfee7a14cf7de9f22285d9e9db3bf423c36f3f4a82c0dce7294b0fb1532c863"]
+["docker.elastic.co/beats/filebeat:8.17.3"] arm64 ["docker.elastic.co/beats/filebeat@sha256:cbbb141dae7384a3c2b9f4300e99a3a35b7b2814f9f1c5df98dae56209e984cd"]
+["prom/prometheus:v3.2.1"] arm64 ["prom/prometheus@sha256:6927e0919a144aa7616fd0137d4816816d42f6b816de3af269ab065250859a62"]
+["grafana/grafana:11.6.0"] arm64 ["grafana/grafana@sha256:62d2b9d20a19714ebfe48d1bb405086081bc602aa053e28cf6d73c7537640dfb"]

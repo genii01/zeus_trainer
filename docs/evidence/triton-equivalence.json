@@ -1,0 +1,5 @@
+{
+  "triton_equivalence": "passed",
+  "top1": "Samoyed",
+  "max_abs_error": 7.152557373046875e-06
+}

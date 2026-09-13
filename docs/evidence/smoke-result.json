@@ -1,0 +1,175 @@
+{
+  "status": "passed",
+  "result": {
+    "request_id": "7e593713-616f-41a7-a70b-431c62488759",
+    "model": "mobilenet_v2",
+    "version": "1",
+    "predictions": [
+      {
+        "rank": 1,
+        "class_id": 258,
+        "label": "Samoyed",
+        "probability": 0.30912330751601685
+      },
+      {
+        "rank": 2,
+        "class_id": 259,
+        "label": "Pomeranian",
+        "probability": 0.05095308274341691
+      },
+      {
+        "rank": 3,
+        "class_id": 261,
+        "label": "keeshond",
+        "probability": 0.015939273783493215
+      },
+      {
+        "rank": 4,
+        "class_id": 270,
+        "label": "white wolf",
+        "probability": 0.014329393332674752
+      },
+      {
+        "rank": 5,
+        "class_id": 279,
+        "label": "Arctic fox",
+        "probability": 0.010849106378803767
+      }
+    ],
+    "timing": {
+      "preprocess_ms": 25.72033400019791,
+      "triton_roundtrip_ms": 14.96816700000636,
+      "postprocess_ms": 0.12375000005704351,
+      "total_ms": 40.95266600006653
+    }
+  },
+  "indexed_event": {
+    "@timestamp": "2026-09-13T14:36:45.935Z",
+    "request": {
+      "id": "7e593713-616f-41a7-a70b-431c62488759"
+    },
+    "classification": {
+      "top_k": [
+        {
+          "label": "Samoyed",
+          "probability": 0.30912330751601685,
+          "rank": 1,
+          "class_id": 258
+        },
+        {
+          "class_id": 259,
+          "label": "Pomeranian",
+          "probability": 0.05095308274341691,
+          "rank": 2
+        },
+        {
+          "rank": 3,
+          "class_id": 261,
+          "label": "keeshond",
+          "probability": 0.015939273783493215
+        },
+        {
+          "class_id": 270,
+          "label": "white wolf",
+          "probability": 0.014329393332674752,
+          "rank": 4
+        },
+        {
+          "label": "Arctic fox",
+          "probability": 0.010849106378803767,
+          "rank": 5,
+          "class_id": 279
+        }
+      ],
+      "label": "Samoyed",
+      "class_id": 258,
+      "probability": 0.30912330751601685
+    },
+    "ecs": {
+      "version": "8.0.0"
+    },
+    "agent": {
+      "type": "filebeat",
+      "version": "8.17.3",
+      "ephemeral_id": "a483642b-90ea-446b-896b-d747623e58ae",
+      "id": "f67413fb-144c-4fa4-83f0-20243781fc9b",
+      "name": "ddf2ff710170"
+    },
+    "input": {
+      "type": "filestream"
+    },
+    "host": {
+      "name": "ddf2ff710170"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "service": {
+      "name": "fastapi"
+    },
+    "model": {
+      "version": "1",
+      "name": "mobilenet_v2"
+    },
+    "latency": {
+      "preprocess_ms": 25.72033400019791,
+      "postprocess_ms": 0.12375000005704351,
+      "total_ms": 40.95266600006653,
+      "triton_roundtrip_ms": 14.96816700000636
+    },
+    "event": {
+      "id": "1547aadc-8791-4ea0-845d-2a85a1ee5bd7",
+      "action": "inference.completed",
+      "outcome": "success",
+      "duration": 40952666
+    },
+    "log": {
+      "offset": 50301,
+      "file": {
+        "path": "/var/log/inference/events.jsonl",
+        "device_id": "65025",
+        "inode": "540214",
+        "fingerprint": "7e3cdcaf3a47422477e34d00f16604f2253ea8dcc9d0924f18328ac82ebd5e5b"
+      },
+      "level": "INFO"
+    }
+  },
+  "prometheus_up": [
+    {
+      "metric": {
+        "__name__": "up",
+        "instance": "api:8000",
+        "job": "api"
+      },
+      "value": [
+        1789310226.194,
+        "1"
+      ]
+    },
+    {
+      "metric": {
+        "__name__": "up",
+        "instance": "triton:8002",
+        "job": "triton"
+      },
+      "value": [
+        1789310226.194,
+        "1"
+      ]
+    }
+  ],
+  "prometheus_counter_deltas": {
+    "triton_success": {
+      "before": 52.0,
+      "after": 53.0,
+      "delta": 1.0
+    },
+    "api_classify_200": {
+      "before": 0,
+      "after": 1.0,
+      "delta": 1.0
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "model": "mobilenet_v2",
+  "version": "1",
+  "weights": "MobileNet_V2_Weights.IMAGENET1K_V2",
+  "weights_url": "https://download.pytorch.org/models/mobilenet_v2-7ebf99e0.pth",
+  "weights_sha256": "7ebf99e03e254b273379b23edca7ec0da9f48273b23a332b93c1c99d49e86e8f",
+  "onnx_sha256": "ae5c8803d1ed50518f3d18dc5113c2851bf89c7b32cb0e853a0a03d32159d8cf",
+  "labels_sha256": "e1b7bd760737c9aaa4bb95d92e1c2069312b2fe24f79f01cf97d806c6cf3cd9a",
+  "sample_url": "https://raw.githubusercontent.com/pytorch/hub/master/images/dog.jpg",
+  "sample_sha256": "f3f87bb8ab3c26c7ecfd3ac60421d7f32b0503d1d6c5baf8bac42ed93d86351a",
+  "platform": "aarch64",
+  "versions": {
+    "torch": "2.6.0+cpu",
+    "torchvision": "0.21.0",
+    "onnx": "1.17.0",
+    "onnxruntime": "1.21.0"
+  }
+}

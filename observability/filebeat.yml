@@ -1,0 +1,34 @@
+filebeat.inputs:
+  - type: filestream
+    id: inference-events
+    enabled: true
+    paths:
+      - /var/log/inference/events.jsonl*
+    parsers:
+      - ndjson:
+          target: ""
+          add_error_key: true
+          overwrite_keys: true
+          expand_keys: true
+    prospector.scanner.fingerprint:
+      enabled: true
+      offset: 0
+      length: 256
+    file_identity.fingerprint: ~
+    processors:
+      - copy_fields:
+          fields:
+            - from: event.id
+              to: '@metadata._id'
+          fail_on_error: false
+          ignore_missing: true
+
+filebeat.registry.path: /usr/share/filebeat/data/registry
+
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
+  index: "inference-events-%{+yyyy.MM.dd}"
+
+setup.ilm.enabled: false
+setup.template.enabled: false
+logging.metrics.enabled: false
